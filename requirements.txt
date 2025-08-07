@@ -2,7 +2,6 @@ yfinance
 pandas
 pandas-ta
 python-telegram-bot
-asyncio
 fastapi
 uvicorn[standard]
 setuptools
