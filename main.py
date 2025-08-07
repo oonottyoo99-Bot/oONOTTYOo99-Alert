@@ -1,12 +1,12 @@
-# main.py (เวอร์ชัน Hybrid สำหรับ Web Service + Scanner)
+# main.py (เวอร์ชันสุดท้าย - ไม่ใช้ pandas-ta)
 import os
 import yfinance as yf
-import pandas_ta as ta
+import pandas as pd
 import telegram
 import asyncio
 from fastapi import FastAPI
 
-# --- ตั้งค่าเริ่มต้น (เหมือนเดิม) ---
+# --- ตั้งค่าเริ่มต้น ---
 TICKERS_TO_SCAN = [
     "BTC-USD", "ETH-USD", "SOL-USD", "XRP-USD",
     "SPY", "QQQ", "VOO",
@@ -18,7 +18,30 @@ TIME_FRAME = "1d"
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
-# --- ส่วนของการสแกน (เหมือนเดิม) ---
+# --- ฟังก์ชันคำนวณ Indicator ของเราเอง ---
+
+def calculate_ema(prices, length):
+    return prices.ewm(span=length, adjust=False).mean()
+
+def calculate_sma(data, length):
+    return data.rolling(window=length).mean()
+
+def calculate_rsi(prices, length=14):
+    delta = prices.diff()
+    gain = (delta.where(delta > 0, 0)).rolling(window=length).mean()
+    loss = (-delta.where(delta < 0, 0)).rolling(window=length).mean()
+    rs = gain / loss
+    return 100 - (100 / (1 + rs))
+
+def calculate_macd(prices, fast=12, slow=26, signal=9):
+    ema_fast = calculate_ema(prices, fast)
+    ema_slow = calculate_ema(prices, slow)
+    macd_line = ema_fast - ema_slow
+    signal_line = calculate_ema(macd_line, signal)
+    return macd_line, signal_line
+
+# --- ส่วนของการสแกนและส่งข้อความ ---
+
 async def send_telegram_message(message: str):
     if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
         print("Error: ไม่ได้ตั้งค่า TELEGRAM_TOKEN หรือ TELEGRAM_CHAT_ID")
@@ -33,14 +56,15 @@ async def send_telegram_message(message: str):
 async def analyze_ticker(ticker: str):
     print(f"--- กำลังวิเคราะห์ {ticker} ---")
     try:
-        data = yf.download(ticker, period="200d", interval=TIME_FRAME, progress=False)
+        data = yf.download(ticker, period="250d", interval=TIME_FRAME, progress=False)
         if data.empty: return
 
-        data.ta.ema(length=100, append=True, col_names=('EMA100'))
-        data.ta.ema(length=200, append=True, col_names=('EMA200'))
-        data.ta.rsi(length=14, append=True, col_names=('RSI_14'))
-        data.ta.macd(fast=12, slow=26, signal=9, append=True, col_names=('MACD', 'MACDh', 'MACDs'))
-        data.ta.sma(length=20, close='Volume', append=True, col_names=('Volume_SMA20'))
+        # คำนวณ Indicators ด้วยฟังก์ชันของเราเอง
+        data['EMA100'] = calculate_ema(data['Close'], 100)
+        data['EMA200'] = calculate_ema(data['Close'], 200)
+        data['RSI_14'] = calculate_rsi(data['Close'], 14)
+        data['MACD'], data['MACDs'] = calculate_macd(data['Close'])
+        data['Volume_SMA20'] = calculate_sma(data['Volume'], 20)
         
         latest = data.iloc[-1]
         
@@ -59,29 +83,20 @@ async def analyze_ticker(ticker: str):
         print(f"เกิดข้อผิดพลาดระหว่างวิเคราะห์ {ticker}: {e}")
 
 async def run_scan():
-    """ฟังก์ชันหลักที่จะถูกเรียกให้ทำงานเบื้องหลัง"""
     print("--- เริ่มการสแกนรอบใหม่ ---")
     for ticker in TICKERS_TO_SCAN:
         await analyze_ticker(ticker)
     print("--- การสแกนเสร็จสิ้น ---")
 
-# --- ส่วนของ Web Server (ส่วนใหม่) ---
+# --- ส่วนของ Web Server ---
 app = FastAPI()
 
 @app.get("/")
 def home():
-    """หน้าหลักของเว็บ แสดงข้อความว่าพร้อมทำงาน"""
-    return {"status": "API is online and ready. The real work happens at /run_scan."}
+    return {"status": "API is online. Ready to be triggered."}
 
 @app.get("/run_scan")
 async def trigger_scan():
-    """
-    Endpoint ที่จะให้ cron-job.org เข้ามาเรียก (ปลุก)
-    เมื่อถูกเรียก จะสั่งให้ run_scan() ทำงานเบื้องหลัง
-    และตอบกลับทันทีเพื่อไม่ให้ตัวปลุกต้องรอนาน
-    """
     print("Scan triggered by external job.")
-    # สั่งให้การสแกนทำงานเบื้องหลัง
     asyncio.create_task(run_scan())
-    # ตอบกลับทันที
     return {"status": "Scan triggered successfully in the background."}
