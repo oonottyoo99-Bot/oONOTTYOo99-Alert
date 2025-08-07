@@ -17,7 +17,7 @@ app = FastAPI()
 
 @app.get("/")
 def read_root():
-    return {"Status": "Trading Alert API is running!"}
+    return {"Status": "API is running!"}
 
 @app.post("/webhook/tradingview")
 async def tradingview_webhook(request: Request):
@@ -41,4 +41,5 @@ async def tradingview_webhook(request: Request):
 # ส่วนนี้เพื่อให้ Railway รู้ว่าต้องรันแอปด้วย port อะไร
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
+
     uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)
