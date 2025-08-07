@@ -5,3 +5,7 @@ fastapi
 uvicorn[standard]
 PyGithub
 httpx
+pycoingecko
+requests
+beautifulsoup4
+html5lib
