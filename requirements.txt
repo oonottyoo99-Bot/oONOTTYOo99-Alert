@@ -1,8 +1,6 @@
 yfinance
 pandas
-pandas-ta
 python-telegram-bot
 fastapi
 uvicorn[standard]
-setuptools
 
