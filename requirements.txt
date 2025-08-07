@@ -1,3 +1,5 @@
-fastapi
-uvicorn
+yfinance
+pandas
+pandas-ta
 python-telegram-bot
+asyncio
