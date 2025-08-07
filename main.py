@@ -1,4 +1,4 @@
-# main.py (เวอร์ชัน Final Backend - บันทึกผลลง GitHub)
+# main.py (เวอร์ชัน Final v2 - แก้ไข PyGithub)
 import os
 import yfinance as yf
 import pandas as pd
@@ -6,7 +6,7 @@ import telegram
 import asyncio
 import json
 from fastapi import FastAPI
-from github import Github, InputFile
+from github import Github # <<< แก้ไข: เอา InputFile ออก
 from datetime import datetime, timezone, timedelta
 
 # --- การตั้งค่า ---
@@ -31,7 +31,7 @@ def calculate_rsi(prices, length=14):
     delta = prices.diff()
     gain = (delta.where(delta > 0, 0)).rolling(window=length).mean()
     loss = (-delta.where(delta < 0, 0)).rolling(window=length).mean()
-    if loss.iloc[-1] == 0: return 100.0
+    if loss.empty or loss.iloc[-1] == 0: return 100.0
     rs = gain / loss
     return 100 - (100 / (1 + rs))
 def calculate_macd(prices, fast=12, slow=26, signal=9):
@@ -42,7 +42,6 @@ def calculate_macd(prices, fast=12, slow=26, signal=9):
 
 # --- ฟังก์ชันหลัก ---
 async def send_telegram_message(message: str):
-    # ... (โค้ดเหมือนเดิม)
     if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID: return
     try:
         bot = telegram.Bot(token=TELEGRAM_TOKEN)
@@ -60,7 +59,7 @@ async def analyze_ticker(ticker: str):
         data['RSI_14'] = calculate_rsi(data['Close'], 14)
         data['MACD'], data['MACDs'] = calculate_macd(data['Close'])
         data['Volume_SMA20'] = calculate_sma(data['Volume'], 20)
-        
+
         latest = data.iloc[-1]
         signal_info = { "ticker": ticker, "timeframe": TIME_FRAME, "price": f"{latest['Close']:.2f}" }
 
@@ -68,13 +67,13 @@ async def analyze_ticker(ticker: str):
         is_above_emas = latest['Close'] > latest['EMA100'] and latest['Close'] > latest['EMA200']
         is_rsi_strong = latest['RSI_14'] > 55
         is_macd_positive = latest['MACD'] > latest['MACDs']
-        
+
         if is_above_emas and is_rsi_strong and is_macd_positive and is_volume_spike:
             signal_info["signal"] = "Strong Buy"
             signal_info["details"] = "Price above EMAs, RSI > 55, MACD crossover, with Volume Spike."
             await send_telegram_message(f"🚀 *Strong Buy Signal!*\n*{ticker}* ({TIME_FRAME})")
             return signal_info
-            
+
         if is_volume_spike:
             signal_info["signal"] = "Volume Spike"
             signal_info["details"] = "Volume is significantly higher than 20-period average."
@@ -92,28 +91,26 @@ def update_signals_on_github(signals: list):
     try:
         g = Github(GITHUB_TOKEN)
         repo = g.get_repo(REPO_NAME)
-        
+
         utc_now = datetime.now(timezone.utc)
         bangkok_now = utc_now.astimezone(timezone(timedelta(hours=7)))
-        
+
         content_to_write = {
             "last_updated": bangkok_now.strftime("%Y-%m-%d %H:%M:%S Bangkok"),
             "signals_found": signals
         }
-        
+
         file_path = "signals.json"
         json_content = json.dumps(content_to_write, indent=4)
-        
+
         try:
-            # พยายามอัปเดตไฟล์เดิมก่อน
             contents = repo.get_contents(file_path, ref="main")
             repo.update_file(contents.path, f"Update signals {bangkok_now.isoformat()}", json_content, contents.sha, branch="main")
             print(f"✅ Successfully updated {file_path} on GitHub.")
         except:
-            # ถ้าไม่มีไฟล์เดิม ให้สร้างใหม่
             repo.create_file(file_path, f"Create signals {bangkok_now.isoformat()}", json_content, branch="main")
             print(f"✅ Successfully created {file_path} on GitHub.")
-            
+
     except Exception as e:
         print(f"❌ GitHub update error: {e}")
 
@@ -122,25 +119,16 @@ async def run_scan():
     found_signals = []
     tasks = [analyze_ticker(ticker) for ticker in TICKERS_TO_SCAN]
     results = await asyncio.gather(*tasks)
-    
+
     for res in results:
         if res:
             found_signals.append(res)
-            
-    if found_signals:
-        update_signals_on_github(found_signals)
-    else:
+
+    # แก้ไข: เปลี่ยนเงื่อนไขเป็น 'if found_signals:' เพื่อให้สร้างไฟล์ว่างถ้าไม่เจอสัญญาณ
+    update_signals_on_github(found_signals)
+    if not found_signals:
         print("No new signals found in this cycle.")
-        
+
     print("--- Scan cycle finished ---")
 
-# --- Web Server (เหมือนเดิม) ---
-app = FastAPI()
-
-@app.get("/")
-def home(): return {"status": "Scanner API is online."}
-
-@app.get("/run_scan")
-async def trigger_scan():
-    asyncio.create_task(run_scan())
-    return {"status": "Scan triggered in background."}
+# --- Web Server ---
