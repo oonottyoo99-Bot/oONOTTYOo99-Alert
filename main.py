@@ -1,4 +1,4 @@
-# main.py (Dashboard-Ready Version)
+# main.py (Stable Version - No Crypto)
 import os
 import yfinance as yf
 import pandas as pd
@@ -9,7 +9,6 @@ import requests
 from fastapi import FastAPI, Query
 from github import Github
 from datetime import datetime, timezone, timedelta
-from pycoingecko import CoinGeckoAPI
 from bs4 import BeautifulSoup
 
 # --- การตั้งค่า ---
@@ -23,7 +22,6 @@ GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 REPO_NAME = "oONOTTYOo99-Bot/oONOTTYOo99-Alert"
 
 # --- ฟังก์ชันดึงรายชื่อสินทรัพย์แบบ Dynamic ---
-
 def get_sp500_tickers():
     print("Fetching S&P 500 tickers...")
     try:
@@ -39,7 +37,7 @@ def get_nasdaq100_tickers():
     try:
         url = 'https://en.wikipedia.org/wiki/Nasdaq-100'
         html = requests.get(url, timeout=15).content
-        df = pd.read_html(html)[4] # The 4th table on the page
+        df = pd.read_html(html)[4]
         return [ticker.replace('.', '-') for ticker in df['Ticker'].tolist()]
     except Exception as e:
         print(f"Error fetching Nasdaq 100: {e}"); return []
@@ -51,29 +49,10 @@ def get_set_tickers(group):
         headers = {'User-Agent': 'Mozilla/5.0'}
         response = requests.get(url, headers=headers, timeout=15)
         soup = BeautifulSoup(response.content, 'html.parser')
-        # Find tickers from the specific table structure of settrade
         tickers = [a.text.strip() + ".BK" for a in soup.select('div.symbol-name a')]
         return tickers
     except Exception as e:
         print(f"Error fetching {group}: {e}"); return []
-
-def get_crypto_tickers():
-    print("Fetching Crypto tickers...")
-    try:
-        cg = CoinGeckoAPI()
-        all_tickers = set()
-        # Top 100 Altcoins
-        top_101 = cg.get_coins_markets(vs_currency='usd', per_page=101, page=1)
-        altcoins = {f"{c['symbol'].upper()}-USD" for c in top_101 if c['symbol'].lower() != 'btc'}
-        all_tickers.update(altcoins)
-        # Top Layer 2
-        l2_data = cg.get_coins_by_category(category_id='layer-2')
-        l2_tickers = {f"{c['symbol'].upper()}-USD" for c in l2_data[:20]}
-        all_tickers.update(l2_tickers)
-        # Layer 3 is not a standard category, so we skip it.
-        return list(all_tickers)
-    except Exception as e:
-        print(f"Error fetching Crypto: {e}"); return []
 
 def get_etf_tickers():
     return [
@@ -85,8 +64,7 @@ def get_etf_tickers():
 def get_gold_ticker():
     return ["GLD"]
 
-# --- ฟังก์ชันคำนวณและสแกน (เหมือนเดิม) ---
-# ... (วางฟังก์ชัน calculate_ema, calculate_sma, calculate_rsi, calculate_macd, send_telegram_message, analyze_ticker, update_signals_on_github ทั้งหมดไว้ที่นี่) ...
+# --- ฟังก์ชันคำนวณและสแกน ---
 def calculate_ema(prices, length): return prices.ewm(span=length, adjust=False).mean()
 def calculate_sma(data, length): return data.rolling(window=length).mean()
 def calculate_rsi(prices, length=14):
@@ -129,42 +107,33 @@ def update_signals_on_github(signals: list, group: str):
         print(f"✅ Successfully updated/created {file_path} on GitHub.")
     except Exception as e: print(f"❌ GitHub update error: {e}")
 
-# --- ฟังก์ชัน Run Scan ที่ถูกอัปเกรด ---
 async def run_scan(group: str):
     print(f"--- Starting new scan cycle for group: {group} ---")
-    
     tickers_to_scan = []
     if group == 'sp500': tickers_to_scan = get_sp500_tickers()
     elif group == 'nasdaq100': tickers_to_scan = get_nasdaq100_tickers()
     elif group == 'etf': tickers_to_scan = get_etf_tickers()
-    elif group == 'crypto': tickers_to_scan = get_crypto_tickers()
+    # elif group == 'crypto': tickers_to_scan = get_crypto_tickers() # <== ปิดส่วนนี้ไปก่อน
     elif group == 'set50': tickers_to_scan = get_set_tickers('SET50')
     elif group == 'set100': tickers_to_scan = get_set_tickers('SET100')
     elif group == 'gold': tickers_to_scan = get_gold_ticker()
     else: print(f"Unknown group: {group}"); return
 
     if not tickers_to_scan: print(f"No tickers found for group: {group}"); return
-
     found_signals = []
     tasks = [analyze_ticker(ticker) for ticker in tickers_to_scan]
     results = await asyncio.gather(*tasks)
-    
     for res in results:
         if res: found_signals.append(res)
-            
     update_signals_on_github(found_signals, group)
     print(f"--- Scan cycle for {group} finished ---")
 
-# --- Web Server ---
 app = FastAPI()
-
 @app.get("/")
 def home(): return {"status": "Dashboard-Ready Scanner API is online."}
-
 @app.get("/run_scan")
 async def trigger_scan(group: str = Query(None)):
     if not group: return {"error": "Please provide a 'group' parameter."}
-    
-    # Run in background
+    if group == 'crypto': return {"status": "Crypto scanning is temporarily disabled."} # <== เพิ่มการป้องกัน
     asyncio.create_task(run_scan(group))
     return {"status": f"Scan triggered for group '{group}' in the background."}
