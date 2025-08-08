@@ -1,4 +1,4 @@
-# main.py (Crypto Exchange Version)
+# main.py (V5 - With Auto-Scan Settings)
 import os
 import yfinance as yf
 import pandas as pd
@@ -7,7 +7,7 @@ import asyncio
 import json
 import requests
 import ccxt
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Query, Body
 from github import Github
 from datetime import datetime, timezone, timedelta
 from bs4 import BeautifulSoup
@@ -22,48 +22,34 @@ TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 REPO_NAME = "oONOTTYOo99-Bot/oONOTTYOo99-Alert"
 
-# --- ฟังก์ชันดึงรายชื่อสินทรัพย์ ---
-
+# --- ฟังก์ชันดึงรายชื่อสินทรัพย์ (เหมือนเดิม) ---
 def get_exchange_top_tickers(exchange_name, limit=200):
-    """Fetches top traded tickers from a specific exchange using ccxt."""
     print(f"Fetching Top {limit} tickers from {exchange_name.capitalize()}...")
     try:
-        exchange = getattr(ccxt, exchange_name)()
-        markets = exchange.fetch_markets()
+        exchange = getattr(ccxt, exchange_name)(); markets = exchange.fetch_markets()
         usdt_pairs = [m for m in markets if m['quote'] == 'USDT' and m.get('active', True)]
-        
         tickers_data = exchange.fetch_tickers([m['symbol'] for m in usdt_pairs])
-        
         sorted_tickers = sorted(tickers_data.values(), key=lambda t: t.get('quoteVolume', 0), reverse=True)
-        
-        # Convert symbols for yfinance (e.g., BTC/USDT -> BTC-USD)
         yfinance_tickers = [f"{t['symbol'].split('/')[0]}-USD" for t in sorted_tickers[:limit]]
-        
         print(f"Found {len(yfinance_tickers)} tickers from {exchange_name.capitalize()}.")
         return yfinance_tickers
-    except Exception as e:
-        print(f"Error fetching from {exchange_name}: {e}")
-        return []
-
+    except Exception as e: print(f"Error fetching from {exchange_name}: {e}"); return []
 def get_sp500_tickers():
     print("Fetching S&P 500 tickers..."); try:
         url = 'https://en.wikipedia.org/wiki/List_of_S%26P_500_companies'; html = requests.get(url, timeout=15).content
         df = pd.read_html(html)[0]; return [ticker.replace('.', '-') for ticker in df['Symbol'].tolist()]
     except Exception as e: print(f"Error fetching S&P 500: {e}"); return []
-
 def get_nasdaq100_tickers():
     print("Fetching Nasdaq 100 tickers..."); try:
         url = 'https://en.wikipedia.org/wiki/Nasdaq-100'; html = requests.get(url, timeout=15).content
         df = pd.read_html(html)[4]; return [ticker.replace('.', '-') for ticker in df['Ticker'].tolist()]
     except Exception as e: print(f"Error fetching Nasdaq 100: {e}"); return []
-
 def get_set_tickers(group):
     print(f"Fetching {group} tickers..."); try:
         url = f'https://www.settrade.com/th/equities/market-data/set{group.split("SET")[1]}'
         headers = {'User-Agent': 'Mozilla/5.0'}; response = requests.get(url, headers=headers, timeout=15)
         soup = BeautifulSoup(response.content, 'html.parser'); return [a.text.strip() + ".BK" for a in soup.select('div.symbol-name a')]
     except Exception as e: print(f"Error fetching {group}: {e}"); return []
-
 def get_etf_tickers(): return ["SPY", "IVV", "VTI", "VOO", "QQQ", "VEA", "VTV", "IEFA", "VUG", "AGG", "VWO", "BND", "IWM", "IWF", "EFA", "IJH", "IJR", "XLF", "VIG", "SCHD", "XLK", "XLY", "XLP", "XLE", "XLV", "XLI", "VGT", "VNQ", "DIA", "USO"]
 def get_gold_ticker(): return ["GLD"]
 
@@ -98,47 +84,75 @@ async def analyze_ticker(ticker: str):
             signal_info["signal"] = "Volume Spike"; await send_telegram_message(f"🔔 *Volume Spike Alert!*\n*{ticker}* ({TIME_FRAME})"); return signal_info
     except Exception as e: print(f"Analyze Error for {ticker}: {e}")
     return None
-def update_signals_on_github(signals: list, group: str):
+def update_json_on_github(file_path: str, content_to_write: dict, commit_message: str):
     if not GITHUB_TOKEN: print("GitHub Token not found."); return
     try:
-        g = Github(GITHUB_TOKEN); repo = g.get_repo(REPO_NAME); utc_now = datetime.now(timezone.utc)
-        bangkok_now = utc_now.astimezone(timezone(timedelta(hours=7)))
-        content_to_write = {"last_updated": bangkok_now.strftime("%Y-%m-%d %H:%M:%S Bangkok"), "scan_group": group, "signals_found": signals}
-        file_path = "signals.json"; json_content = json.dumps(content_to_write, indent=4)
-        try: contents = repo.get_contents(file_path, ref="main"); repo.update_file(contents.path, f"Update signals for {group}", json_content, contents.sha, branch="main")
-        except: repo.create_file(file_path, f"Create signals for {group}", json_content, branch="main")
+        g = Github(GITHUB_TOKEN); repo = g.get_repo(REPO_NAME)
+        json_content = json.dumps(content_to_write, indent=4)
+        try:
+            contents = repo.get_contents(file_path, ref="main")
+            repo.update_file(contents.path, commit_message, json_content, contents.sha, branch="main")
+        except:
+            repo.create_file(file_path, commit_message, json_content, branch="main")
         print(f"✅ Successfully updated/created {file_path} on GitHub.")
-    except Exception as e: print(f"❌ GitHub update error: {e}")
+    except Exception as e: print(f"❌ GitHub update error for {file_path}: {e}")
 
 async def run_scan(group: str):
     print(f"--- Starting new scan cycle for group: {group} ---")
-    tickers_to_scan = []
-    if group == 'sp500': tickers_to_scan = get_sp500_tickers()
-    elif group == 'nasdaq100': tickers_to_scan = get_nasdaq100_tickers()
-    elif group == 'etf': tickers_to_scan = get_etf_tickers()
-    elif group == 'altcoins': tickers_to_scan = get_exchange_top_tickers('okx') # Default to OKX
-    elif group == 'binance': tickers_to_scan = get_exchange_top_tickers('binance')
-    elif group == 'okx': tickers_to_scan = get_exchange_top_tickers('okx')
-    elif group == 'bitkub': tickers_to_scan = get_exchange_top_tickers('bitkub')
-    elif group == 'set50': tickers_to_scan = get_set_tickers('SET50')
-    elif group == 'set100': tickers_to_scan = get_set_tickers('SET100')
-    elif group == 'gold': tickers_to_scan = get_gold_ticker()
-    else: print(f"Unknown group: {group}"); return
-
+    tickers_map = {
+        'sp500': get_sp500_tickers, 'nasdaq100': get_nasdaq100_tickers,
+        'etf': get_etf_tickers, 'altcoins': lambda: get_exchange_top_tickers('okx'),
+        'binance': lambda: get_exchange_top_tickers('binance'), 'okx': lambda: get_exchange_top_tickers('okx'),
+        'bitkub': lambda: get_exchange_top_tickers('bitkub'), 'set50': lambda: get_set_tickers('SET50'),
+        'set100': lambda: get_set_tickers('SET100'), 'gold': get_gold_ticker
+    }
+    if group not in tickers_map: print(f"Unknown group: {group}"); return
+    
+    tickers_to_scan = tickers_map[group]()
     if not tickers_to_scan: print(f"No tickers found for group: {group}"); return
-    found_signals = []
-    tasks = [analyze_ticker(ticker) for ticker in tickers_to_scan]
-    results = await asyncio.gather(*tasks)
-    for res in results:
-        if res: found_signals.append(res)
-    update_signals_on_github(found_signals, group)
+
+    found_signals = [res for res in await asyncio.gather(*[analyze_ticker(t) for t in tickers_to_scan]) if res]
+    
+    bangkok_now = datetime.now(timezone.utc).astimezone(timezone(timedelta(hours=7)))
+    update_json_on_github(
+        "signals.json",
+        {"last_updated": bangkok_now.strftime("%Y-%m-%d %H:%M:%S Bangkok"), "scan_group": group, "signals_found": found_signals},
+        f"Update signals for {group}"
+    )
     print(f"--- Scan cycle for {group} finished ---")
 
 app = FastAPI()
+
 @app.get("/")
-def home(): return {"status": "Crypto-Ready Scanner API is online."}
+def home(): return {"status": "Dashboard-Ready Scanner API is online."}
+
+@app.post("/save_settings")
+async def save_settings(settings: dict = Body(...)):
+    print(f"Received settings to save: {settings}")
+    bangkok_now = datetime.now(timezone.utc).astimezone(timezone(timedelta(hours=7)))
+    content = {
+        "last_updated": bangkok_now.strftime("%Y-%m-%d %H:%M:%S Bangkok"),
+        "auto_scan_groups": settings.get("auto_scan_groups", [])
+    }
+    update_json_on_github("settings.json", content, "Update auto-scan settings")
+    return {"status": "Settings saved successfully."}
+
 @app.get("/run_scan")
 async def trigger_scan(group: str = Query(None)):
-    if not group: return {"error": "Please provide a 'group' parameter."}
-    asyncio.create_task(run_scan(group))
-    return {"status": f"Scan triggered for group '{group}' in the background."}
+    if group: # Manual scan from dashboard button
+        asyncio.create_task(run_scan(group))
+        return {"status": f"Manual scan triggered for group '{group}'."}
+    else: # Automatic scan from cron-job.org
+        print("--- Starting automatic scan cycle based on settings ---")
+        try:
+            g = Github(GITHUB_TOKEN); repo = g.get_repo(REPO_NAME)
+            settings_content = repo.get_contents("settings.json").decoded_content.decode()
+            settings = json.loads(settings_content)
+            groups_to_scan = settings.get("auto_scan_groups", [])
+            print(f"Found auto-scan groups: {groups_to_scan}")
+            for g in groups_to_scan:
+                await run_scan(g)
+            return {"status": "Automatic scan finished."}
+        except Exception as e:
+            print(f"Could not run automatic scan: {e}")
+            return {"error": "Could not read settings.json or run scan."}
