@@ -1,12 +1,5 @@
 yfinance
 pandas
+pandas-ta
 python-telegram-bot
-fastapi
-uvicorn[standard]
-PyGithub
-httpx
-requests
-beautifulsoup4
-html5lib
-lxml
-ccxt
+asyncio
