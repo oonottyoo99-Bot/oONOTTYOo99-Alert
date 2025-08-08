@@ -6,3 +6,4 @@ asyncio
 fastapi
 uvicorn[standard]
 setuptools
+numpy
