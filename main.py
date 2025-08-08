@@ -6,6 +6,7 @@ import telegram
 import asyncio
 from fastapi import FastAPI
 from typing import List
+from fastapi.middleware.cors import CORSMiddleware
 
 # --- การตั้งค่าเริ่มต้น ---
 # กลุ่มสินทรัพย์ทั้งหมดที่เรามี
@@ -71,6 +72,13 @@ async def run_scan(tickers: List[str]):
 
 # --- ส่วนของ Web Server ---
 app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["https://signal-dashboard-ui.vercel.app"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.get("/")
 def home():
@@ -87,3 +95,4 @@ async def trigger_scan(group_name: str):
     asyncio.create_task(run_scan(tickers_to_scan))
     
     return {"status": "success", "message": f"Scan for group '{group_name}' triggered successfully in the background."}
+
