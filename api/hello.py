@@ -1,7 +1,11 @@
-from flask import Flask, jsonify
+from fastapi import FastAPI
 
-app = Flask(__name__)
+app = FastAPI()
 
 @app.get("/")
-def hello():
-    return jsonify(ok=True, route="/api/hello")
+def root():
+    return {"ok": True, "route": "/api/hello"}
+
+@app.get("/health")
+def health():
+    return {"ok": True}
