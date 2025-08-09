@@ -1,10 +1,10 @@
-from fastapi import FastAPI
-app = FastAPI()
+# api/index.py  — minimal handler for Vercel Python
+from http.server import BaseHTTPRequestHandler
+import json
 
-@app.get("/")
-def root():
-    return {"ok": True}
-
-@app.get("/health")
-def health():
-    return {"ok": True}
+class handler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.end_headers()
+        self.wfile.write(json.dumps({"ok": True, "route": "/api/index"}).encode())
