@@ -1,9 +1,7 @@
-import json
+from flask import Flask, jsonify
 
-def handler(request):
-    body = {"ok": True, "route": "/api/index"}
-    return {
-        "statusCode": 200,
-        "headers": {"Content-Type": "application/json"},
-        "body": json.dumps(body),
-    }
+app = Flask(__name__)
+
+@app.get("/")
+def index():
+    return jsonify(ok=True, route="/api/index")
