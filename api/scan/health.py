@@ -3,7 +3,8 @@ from fastapi import FastAPI
 
 app = FastAPI()
 
-@app.get("/")  # <<< สำคัญ: ต้องเป็น "/" เพราะไฟล์นี้ถูก mount ที่ /api/scan/health
+@app.get("/")                      # สำคัญ: ใช้ "/"
 def health():
     return {"ok": True, "route": "/api/scan/health"}
+
 
