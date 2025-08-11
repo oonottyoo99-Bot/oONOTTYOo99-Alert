@@ -1,28 +1,17 @@
 # api/_shared/app_factory.py
-from fastapi import FastAPI
+from fastapi import FastAPI, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
-import os
 
-def create_app() -> FastAPI:
+def create_app(router: APIRouter) -> FastAPI:
     app = FastAPI()
-
-    # ใส่โดเมนของหน้าเว็บ UI ของคุณที่เรียก API ได้จริง
-    origins = [
-        "https://signal-dashboard-ui.vercel.app",  # UI ที่รันบน Vercel
-        "http://localhost:5173",                   # เผื่อทดสอบ local dev
-    ]
-
-    # เผื่ออยากเติมผ่าน ENV เพิ่มได้ (คั่นด้วย comma)
-    extra = os.getenv("CORS_EXTRA_ORIGINS", "")
-    if extra:
-        origins += [o.strip() for o in extra.split(",") if o.strip()]
-
+    # CORS เปิดกว้างก่อน ช่วงทดสอบ
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=origins,
-        allow_credentials=True,
-        allow_methods=["*"],     # GET/POST/PUT/DELETE...
+        allow_origins=["*"],
+        allow_methods=["*"],
         allow_headers=["*"],
+        allow_credentials=True,
     )
+    # mount router ที่ path รากของฟังก์ชันย่อยนั้นๆ
+    app.include_router(router, prefix="")
     return app
-
