@@ -4,15 +4,15 @@ from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
 
-# CORS — ชั่วคราวเปิดกว้างไว้ก่อน
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # ใส่โดเมนจริงทีหลัง เช่น https://signal-dashboard-ui.vercel.app
+    allow_origins=["*"],   # ค่อยมากำหนดแคบลงทีหลัง
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-@app.post("/")  # <<< สำคัญ: ต้องเป็น "/" เพราะไฟล์นี้ถูก mount ที่ /api/scan
+@app.post("/")                     # สำคัญ: ใช้ "/" เพราะ Vercel mount ที่ /api/scan ให้แล้ว
 async def scan(req: Request):
     try:
         data = await req.json()
