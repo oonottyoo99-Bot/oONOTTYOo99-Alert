@@ -1,10 +1,7 @@
-# api/scan/health.py
 from fastapi import FastAPI
 
 app = FastAPI()
 
-@app.get("/")                      # สำคัญ: ใช้ "/"
+@app.get("/")
 def health():
     return {"ok": True, "route": "/api/scan/health"}
-
-
