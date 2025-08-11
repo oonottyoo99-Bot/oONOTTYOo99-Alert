@@ -1,25 +1,27 @@
 # api/scan.py
-from fastapi import BackgroundTasks
-from api._shared.app_factory import create_app
-from api._shared.scan_logic import scan_group, notify_telegram
+from fastapi import FastAPI
+from pydantic import BaseModel
+from fastapi.middleware.cors import CORSMiddleware
 
-app = create_app()
+app = FastAPI()
+
+# ✅ CORS — ใส่โดเมนหน้าเว็บจริงของคุณ
+origins = [
+    "https://signal-dashboard-ui.vercel.app",  # UI ของคุณ
+    "http://localhost:3000",                   # เผื่อทดสอบ local
+]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,     # ช่วงแรกถ้าติดขัด ลองเป็น ["*"] ชั่วคราวได้
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+class ScanReq(BaseModel):
+    group: str
 
 @app.post("/")
-def scan(body: dict, bg: BackgroundTasks):
-    group = (body or {}).get("group")
-    if not group:
-        return {"ok": False, "error": "group is required"}
-
-    # เรียกลอจิกจริง (ตอนนี้เป็น mock)
-    result = scan_group(group)
-
-    # แจ้งเตือน Telegram (ทำใน background)
-    bg.add_task(
-        notify_telegram,
-        f"[SCAN DONE] {group} → {len(result['items'])} result(s)"
-    )
-
-    # ส่งผลกลับหน้าเว็บ
-    return {"ok": True, "data": result}
-
+async def scan(req: ScanReq):
+    # ยังไม่ต้องสแกนจริง แค่รับค่าแล้วตอบกลับเพื่อเทสให้ผ่านก่อน
+    return {"ok": True, "received_group": req.group}
