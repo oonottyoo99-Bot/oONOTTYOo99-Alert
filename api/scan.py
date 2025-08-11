@@ -1,54 +1,22 @@
 # api/scan.py
-from fastapi import FastAPI
-from pydantic import BaseModel
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
 
-# อนุญาตโดเมนที่เรียกใช้ API (เพิ่ม/ลบได้)
-ALLOWED_ORIGINS = [
-    "https://signal-dashboard-ui.vercel.app",
-    "http://localhost:3000",
-    "https://hoppscotch.io",
-    "https://web.postman.co",
-    "https://www.postman.com",
-]
-
+# CORS — ชั่วคราวเปิดกว้างไว้ก่อน
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
-    allow_credentials=True,
+    allow_origins=["*"],  # ใส่โดเมนจริงทีหลัง เช่น https://signal-dashboard-ui.vercel.app
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# ----- Models -----
-class ScanReq(BaseModel):
-    group: str
-
-
-# ----- Routes -----
-# GET /api/scan  → สำหรับเปิดในเบราว์เซอร์
-@app.get("/")
-async def scan_get():
-    return {
-        "status": "ok",
-        "route": "/api/scan",
-        "methods": ["GET", "POST"],
-        "how_to_use": {
-            "POST": {"body": {"group": "bitkub"}},
-            "health": "/api/scan/health",
-        },
-    }
-
-# GET /api/scan/health  → health check
-@app.get("/health")
-async def scan_health():
-    return {"ok": True, "route": "/api/scan/health"}
-
-# POST /api/scan  → เรียกใช้งานจริง (ยิงจากเว็บ/เครื่องมือทดสอบ)
-@app.post("/")
-async def scan_post(req: ScanReq):
-    group = req.group.strip().lower()
-    # TODO: ใส่ลอจิกสแกนจริงของคุณตรงนี้
+@app.post("/")  # <<< สำคัญ: ต้องเป็น "/" เพราะไฟล์นี้ถูก mount ที่ /api/scan
+async def scan(req: Request):
+    try:
+        data = await req.json()
+    except Exception:
+        data = {}
+    group = data.get("group")
     return {"ok": True, "received_group": group}
