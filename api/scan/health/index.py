@@ -1,12 +1,8 @@
 # api/scan/health/index.py
-from fastapi import APIRouter
-from api._shared.app_factory import create_app
+from fastapi import FastAPI
 
-router = APIRouter()
+app = FastAPI()
 
-@router.get("/")
-async def health_check():
+@app.get("/")
+def health_check():
     return {"status": "ok"}
-
-# <<< สำคัญมาก: ต้องมี app ให้ Vercel เจอ
-app = create_app(router)
