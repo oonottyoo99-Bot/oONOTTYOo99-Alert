@@ -5,14 +5,14 @@ from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
 
-# ✅ CORS — ใส่โดเมนหน้าเว็บจริงของคุณ
+# อนุญาตให้หน้า UI ของคุณเรียกได้
 origins = [
-    "https://signal-dashboard-ui.vercel.app",  # UI ของคุณ
-    "http://localhost:3000",                   # เผื่อทดสอบ local
+    "https://signal-dashboard-ui.vercel.app",
+    "http://localhost:3000",
 ]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,     # ช่วงแรกถ้าติดขัด ลองเป็น ["*"] ชั่วคราวได้
+    allow_origins=origins,    # ถ้ายังติด ให้ลอง ["*"] ชั่วคราวได้
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -23,5 +23,5 @@ class ScanReq(BaseModel):
 
 @app.post("/")
 async def scan(req: ScanReq):
-    # ยังไม่ต้องสแกนจริง แค่รับค่าแล้วตอบกลับเพื่อเทสให้ผ่านก่อน
+    # ตอนนี้ให้ตอบกลับเฉย ๆ เพื่อเทส
     return {"ok": True, "received_group": req.group}
