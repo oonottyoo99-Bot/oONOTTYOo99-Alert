@@ -2,25 +2,20 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=["*"], allow_methods=["*"], allow_headers=["*"]
 )
 
 @app.get("/")
 def scan_get():
-    # สำหรับเทสต์เปิดในเบราว์เซอร์
     return {"ok": True, "route": "/api/scan"}
 
 @app.post("/")
 async def scan_post(req: Request):
+    data = {}
     try:
         data = await req.json()
     except Exception:
-        data = {}
-    group = data.get("group")
-    return {"ok": True, "received_group": group}
-
+        pass
+    return {"ok": True, "received_group": data.get("group")}
