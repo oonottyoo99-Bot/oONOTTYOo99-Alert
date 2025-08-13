@@ -1,23 +1,26 @@
 # api/scan.py
-from fastapi import FastAPI, Request
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi import APIRouter, Request
 
-app = FastAPI()
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"], allow_methods=["*"], allow_headers=["*"]
-)
+router = APIRouter()
 
-@app.get("/")
+# GET /api/scan
+@router.get("/")
 def scan_get():
     return {"ok": True, "route": "/api/scan"}
 
-@app.post("/")
+# POST /api/scan
+@router.post("/")
 async def scan_post(req: Request):
-    data = {}
     try:
         data = await req.json()
     except Exception:
-        pass
-    return {"ok": True, "received_group": data.get("group")}
+        data = {}
+    group = data.get("group")
+    # ตรงนี้ค่อยไปเชื่อม logic จริงภายหลังได้
+    return {"ok": True, "received_group": group}
+
+# GET /api/scan/health
+@router.get("/health")
+def scan_health():
+    return {"ok": True, "route": "/api/scan/health"}
 
