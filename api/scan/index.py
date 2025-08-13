@@ -1,23 +1,29 @@
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
-from api._shared.scan_logic import scan_group, notify_telegram
+# api/scan/index.py
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 
-router = APIRouter()
+app = FastAPI()
 
-# Request body model
-class ScanRequest(BaseModel):
-    group: str
+# เปิด CORS กว้างๆ สำหรับทดสอบ
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+    allow_credentials=True,
+)
 
-@router.post("/")
-async def scan_endpoint(request: ScanRequest):
+@app.get("/")
+def scan_get():
+    return {"ok": True, "route": "/api/scan"}
+
+@app.post("/")
+async def scan_post(req: Request):
     try:
-        # เรียกฟังก์ชันสแกนจาก scan_logic.py
-        scan_result = scan_group(request.group)
+        data = await req.json()
+    except Exception:
+        data = {}
 
-        # ส่งแจ้งเตือนไป Telegram
-        notify_telegram(f"Scan result for group '{request.group}': {scan_result}")
-
-        return scan_result
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
+    group = data.get("group")
+    # จะทำ logic จริงทีหลังค่อยต่อเพิ่ม
+    return {"ok": True, "received_group": group}
