@@ -1,9 +1,8 @@
 # api/scan/health.py
-from fastapi import FastAPI
+from fastapi import APIRouter
 
-app = FastAPI()
+router = APIRouter()
 
-@app.get("/")
+@router.get("/health")
 def health_check():
     return {"status": "ok"}
-
