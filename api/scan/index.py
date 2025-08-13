@@ -11,12 +11,12 @@ app.add_middleware(
 )
 
 # GET /api/scan
-@app.get("/api/scan")
+@app.get("/")
 def scan_get():
     return {"ok": True, "route": "/api/scan"}
 
 # POST /api/scan
-@app.post("/api/scan")
+@app.post("/")
 async def scan_post(req: Request):
     try:
         data = await req.json()
