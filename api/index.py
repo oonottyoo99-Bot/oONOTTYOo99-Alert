@@ -2,10 +2,9 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
-# ----- แอปหลัก -----
 app = FastAPI()
 
-# CORS (กำหนดตามต้องการ)
+# CORS (เปิดกว้างสำหรับทดสอบ)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -14,12 +13,16 @@ app.add_middleware(
     allow_credentials=True,
 )
 
-# ----- เส้นทาง root ของ /api -----
+# ---- root: /api ----
 @app.get("/")
 def root():
-    return {"ok": True, "service": "oONOTTY0o99-Alert API", "routes": ["/api/scan", "/api/scan/health"]}
+    return {
+        "ok": True,
+        "service": "oONOTTYOo99-Alert API",
+        "routes": ["/api/scan", "/api/scan/health"]
+    }
 
-# ----- เส้นทางของ /api/scan -----
+# ---- /api/scan ----
 @app.get("/scan")
 def scan_get():
     return {"ok": True, "route": "/api/scan"}
@@ -33,6 +36,6 @@ async def scan_post(req: Request):
     group = data.get("group")
     return {"ok": True, "received_group": group}
 
-# ----- include router ของ /api/scan/health -----
-from api.scan.health import router as scan_health_router   # สำคัญ: path นี้ต้องตรงกับโครงสร้างโฟลเดอร์จริง
+# ---- include router: /api/scan/health ----
+from api._shared.scan_health import router as scan_health_router
 app.include_router(scan_health_router, prefix="/scan")
