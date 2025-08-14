@@ -1,11 +1,14 @@
-# api/index.py
-from fastapi import FastAPI, Request
+# /api/index.py
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from time import time
+from hello import router as hello_router
+from ping import router as ping_router
+from results import router as results_router
+from scan import router as scan_router
 
 app = FastAPI(title="oONOTTYOo99-Alert API")
 
-# CORS (เปิดกว้างไว้ก่อน)
+# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -14,8 +17,6 @@ app.add_middleware(
     allow_credentials=True,
 )
 
-
-# ---------- Root /api ----------
 @app.get("/")
 def api_root():
     return {
@@ -27,58 +28,11 @@ def api_root():
             "/api/ping",
             "/api/results",
             "/api/scan",
-            "/api/scan/health",
         ],
     }
 
-
-# ---------- Hello ----------
-@app.get("/hello")
-def hello():
-    return {"message": "Hello from FastAPI!"}
-
-
-# ---------- Ping ----------
-@app.get("/ping")
-def ping():
-    return {"pong": True, "ts": int(time())}
-
-
-# ---------- Results (stub) ----------
-@app.get("/results")
-def results(id: str | None = None):
-    return {
-        "ok": True,
-        "note": "No persistent storage connected yet. Use /api/scan response for now.",
-        "id": id,
-        "data": None,
-    }
-
-
-# ---------- Scan (mock) ----------
-@app.get("/scan")
-def scan_get():
-    return {"ok": True, "route": "/api/scan"}
-
-@app.post("/scan")
-async def scan_post(req: Request):
-    # รับ body เป็น JSON: {"group": "xxx"}
-    try:
-        data = await req.json()
-    except Exception:
-        data = {}
-    group = data.get("group")
-    # ตอบ mock กลับไปให้ทดสอบการไหลของงาน
-    return {
-        "ok": True,
-        "received_group": group,
-        "items": [
-            {"symbol": "AAPL", "signal": "BUY"},
-            {"symbol": "MSFT", "signal": "HOLD"},
-        ],
-        "ts": int(time()),
-    }
-
-@app.get("/scan/health")
-def scan_health():
-    return {"ok": True, "route": "/api/scan/health"}
+# รวม router จากไฟล์อื่น
+app.include_router(hello_router, prefix="/hello")
+app.include_router(ping_router, prefix="/ping")
+app.include_router(results_router, prefix="/results")
+app.include_router(scan_router, prefix="/scan")
