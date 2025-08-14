@@ -1,7 +1,7 @@
-from fastapi import FastAPI
-app = FastAPI()
+from fastapi import APIRouter
 
-@app.get("/")
+router = APIRouter()
+
+@router.get("/")
 def hello():
     return {"message": "Hello from FastAPI!"}
-
