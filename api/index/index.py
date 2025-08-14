@@ -1,7 +1,8 @@
-from fastapi import FastAPI
-app = FastAPI()
+# api/index/index.py
+from fastapi import APIRouter
 
-@app.get("/")
+router = APIRouter(tags=["index"])
+
+@router.get("/")
 def index():
     return {"message": "This is index route"}
-
