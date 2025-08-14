@@ -1,7 +1,7 @@
-# api/index/index.py
+# /api/index/index.py
 from fastapi import APIRouter
 
-router = APIRouter(tags=["index"])
+router = APIRouter()
 
 @router.get("/")
 def index():
