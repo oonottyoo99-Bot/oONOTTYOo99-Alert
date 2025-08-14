@@ -1,8 +1,8 @@
-from fastapi import FastAPI
+# /api/ping.py
+from fastapi import APIRouter
 
-app = FastAPI()
+router = APIRouter()
 
-@app.get("/")
+@router.get("/")
 def ping():
-    return {"ok": True, "service": "oONOTTYOo99-Alert"}
-
+    return {"ok": True, "message": "pong"}
