@@ -2,12 +2,11 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-# รวม router จาก scan.py
-from .scan import router as scan_router
+# นำเข้า router ที่อยู่นอก api/
+from app_routes.scan_router import router as scan_router
 
 app = FastAPI()
 
-# CORS (เผื่อเรียกข้ามโดเมน)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -16,7 +15,7 @@ app.add_middleware(
     allow_credentials=True,
 )
 
-# root: /api
+# GET /api
 @app.get("/")
 def root():
     return {
@@ -25,5 +24,5 @@ def root():
         "routes": ["/api/scan (GET, POST)", "/api/scan/health"],
     }
 
-# mount: /api/scan/*
+# รวม /api/scan/*
 app.include_router(scan_router, prefix="/scan")
