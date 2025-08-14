@@ -1,11 +1,14 @@
-# /api/index.py
+# api/index.py
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-# สร้าง FastAPI app (Vercel ต้องเห็นชื่อตัวแปรว่า "app")
+# ⬇️ นำเข้า router จากโมดูลย่อยที่แปลงเป็น APIRouter แล้ว
+from api.index.index import router as index_router       # ให้บริการ /api/index/*
+from api.hello.index import router as hello_router       # ให้บริการ /api/hello/*
+
 app = FastAPI(title="oONOTTYOo99-Alert API")
 
-# อนุญาต CORS แบบกว้าง (ปรับทีหลังได้)
+# CORS (อนุญาตทุก origin ไว้ก่อนสำหรับทดสอบ)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -14,7 +17,7 @@ app.add_middleware(
     allow_credentials=True,
 )
 
-# ---- root ของ /api ----
+# ---------- Root /api ----------
 @app.get("/")
 def api_root():
     return {
@@ -22,13 +25,17 @@ def api_root():
         "service": "oONOTTYOo99-Alert API",
         "routes": [
             "/api",
+            "/api/health",
+            "/api/index",
             "/api/hello",
-            "/api/hello/health",
         ],
     }
 
-# ---- include routers ย่อย ----
-# หมายเหตุ: ไฟล์นี้คาดว่าอยู่ที่ /api/hello.py และมีตัวแปรชื่อ "router"
-from hello import router as hello_router  # noqa: E402
+# ---------- Health /api/health ----------
+@app.get("/health")
+def api_health():
+    return {"ok": True}
 
-app.include_router(hello_router, prefix="/hello", tags=["hello"])
+# ---------- รวม router ย่อย ----------
+app.include_router(index_router, prefix="/index")
+app.include_router(hello_router, prefix="/hello")
