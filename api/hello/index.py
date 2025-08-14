@@ -1,6 +1,7 @@
+# api/hello/index.py
 from fastapi import APIRouter
 
-router = APIRouter()
+router = APIRouter(tags=["hello"])
 
 @router.get("/")
 def hello():
