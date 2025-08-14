@@ -1,8 +1,11 @@
-from fastapi import FastAPI
+# api/hello/health.py
+from fastapi import APIRouter
 
-app = FastAPI()
+router = APIRouter(tags=["hello-health"])
 
-@app.get("/api/hello/health")
-def health():
-    return {"ok": True, "route": "/api/hello/health"}
-
+@router.get("/health")
+def hello_health():
+    return {
+        "ok": True,
+        "route": "/api/hello/health"
+    }
