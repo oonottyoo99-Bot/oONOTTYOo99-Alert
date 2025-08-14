@@ -1,4 +1,3 @@
-# api/index.py
 from fastapi import FastAPI
 
 app = FastAPI()
@@ -7,6 +6,6 @@ app = FastAPI()
 def root():
     return {
         "ok": True,
-        "service": "oONOTTYoo99-Alert API",
-        "routes": ["/api/scan", "/api/scan/health"]
+        "service": "oONOTTYOo99-Alert API",
+        "routes": ["/api/scan", "/api/scan/health"],
     }
