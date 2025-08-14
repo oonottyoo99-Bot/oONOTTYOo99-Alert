@@ -2,13 +2,13 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-# ⬇️ นำเข้า router จากโมดูลย่อยที่แปลงเป็น APIRouter แล้ว
-from api.index.index import router as index_router       # ให้บริการ /api/index/*
-from api.hello.index import router as hello_router       # ให้บริการ /api/hello/*
+# นำเข้า router จากโฟลเดอร์ย่อย (ซึ่งใช้ APIRouter)
+from api.index.index import router as index_router  # ให้บริการ /api/index/*
+from api.hello.index import router as hello_router  # ให้บริการ /api/hello/*
 
 app = FastAPI(title="oONOTTYOo99-Alert API")
 
-# CORS (อนุญาตทุก origin ไว้ก่อนสำหรับทดสอบ)
+# CORS (อนุญาตทุก origin)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -17,7 +17,7 @@ app.add_middleware(
     allow_credentials=True,
 )
 
-# ---------- Root /api ----------
+# -------- Root /api --------
 @app.get("/")
 def api_root():
     return {
@@ -31,11 +31,11 @@ def api_root():
         ],
     }
 
-# ---------- Health /api/health ----------
+# -------- Health /api/health --------
 @app.get("/health")
 def api_health():
     return {"ok": True}
 
-# ---------- รวม router ย่อย ----------
+# -------- รวม router --------
 app.include_router(index_router, prefix="/index")
 app.include_router(hello_router, prefix="/hello")
