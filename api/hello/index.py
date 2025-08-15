@@ -1,9 +1,9 @@
-# /api/hello/index.py
+# api/hello/index.py
 from fastapi import APIRouter
 
 router = APIRouter()
 
 @router.get("/")
-def hello():
+def hello_home():
     return {"message": "Hello from FastAPI!"}
 
