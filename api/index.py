@@ -1,10 +1,11 @@
-# api/index.py
+# /api/index.py  (Vercel -> /api)
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+# ✅ Vercel ต้องการตัวแปรระดับโมดูลชื่อ 'app'
 app = FastAPI(title="oONOTTYOo99-Alert API")
 
-# เปิด CORS กว้าง ๆ แค่ช่วงทดสอบ
+# เปิด CORS ชั่วคราว (ให้ทดสอบได้จากทุกโดเมน)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -13,14 +14,24 @@ app.add_middleware(
     allow_credentials=True,
 )
 
+# ---------- Root (/api) ----------
 @app.get("/")
-def root():
+def api_root():
     return {
         "ok": True,
         "service": "oONOTTYOo99-Alert API",
         "routes": ["/api", "/api/health", "/api/index", "/api/hello"],
     }
 
+# ---------- Health (/api/health) ----------
 @app.get("/health")
-def health():
+def api_health():
     return {"ok": True}
+
+# ---------- include sub-routers ----------
+# ใช้ absolute import เพื่อให้ Vercel/Python หาแพ็กเกจเจอแน่นอน
+from api.routes.index.index import router as index_router
+from api.routes.hello.index import router as hello_router
+
+app.include_router(index_router, prefix="/index")
+app.include_router(hello_router, prefix="/hello")
