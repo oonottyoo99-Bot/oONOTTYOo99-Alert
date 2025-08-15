@@ -1,118 +1,93 @@
-#!/usr/bin/env python3
-import os, shutil, textwrap, sys
+# rebuild_api.py  — wipe & scaffold a minimal FastAPI /api for Vercel
 
-ROOT = os.path.abspath(os.path.dirname(__file__))
-API_DIR = os.path.join(ROOT, "api")
+import os
+import shutil
+from pathlib import Path
+from textwrap import dedent
 
-def write(path: str, content: str = ""):
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, "w", encoding="utf-8") as f:
-        f.write(textwrap.dedent(content).lstrip())
+ROOT = Path(__file__).resolve().parent
+API_DIR = ROOT / "api"
+REQ = ROOT / "requirements.txt"
 
-def main():
-    # 1) Safety check: ต้องอยู่ที่ root โปรเจกต์จริง ๆ
-    must_have = ["requirements.txt", "main.py", "signals.json"]
-    missing = [f for f in must_have if not os.path.exists(os.path.join(ROOT, f))]
-    if missing:
-        print("❌ Not at project root. Missing:", ", ".join(missing))
-        sys.exit(1)
+def write(path: Path, content: str):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(dedent(content).lstrip(), encoding="utf-8")
 
-    # 2) ลบ /api เดิมทั้งหมด (ถ้ามี)
-    if os.path.isdir(API_DIR):
+def ensure_requirements():
+    base = "fastapi>=0.110.0\nuvicorn[standard]>=0.27.0\n"
+    if not REQ.exists():
+        REQ.write_text(base, encoding="utf-8")
+        return
+    txt = REQ.read_text(encoding="utf-8")
+    need = []
+    if "fastapi" not in txt:
+        need.append("fastapi>=0.110.0")
+    if "uvicorn" not in txt:
+        need.append("uvicorn[standard]>=0.27.0")
+    if need:
+        REQ.write_text(txt.rstrip() + "\n" + "\n".join(need) + "\n", encoding="utf-8")
+
+def rebuild_api():
+    # 1) remove old /api
+    if API_DIR.exists():
         shutil.rmtree(API_DIR)
-        print("🧹 Removed old /api directory.")
 
-    # 3) สร้างโครงสร้างใหม่
-    print("📦 Rebuilding /api for Vercel + FastAPI ...")
+    # 2) create fresh functions
 
-    # packages
-    write(os.path.join(API_DIR, "__init__.py"))
-    write(os.path.join(API_DIR, "routes", "__init__.py"))
-    write(os.path.join(API_DIR, "routes", "index", "__init__.py"))
-    write(os.path.join(API_DIR, "routes", "hello", "__init__.py"))
+    # /api  -> /api index function
+    write(API_DIR / "index.py", """
+        from fastapi import FastAPI
 
-    # 4) สร้างไฟล์ router ย่อย (index & hello)
-    write(os.path.join(API_DIR, "routes", "index", "index.py"), """
-        from fastapi import APIRouter
+        app = FastAPI(title="oONOTTYOo99-Alert API (root)")
 
-        router = APIRouter()
-
-        @router.get("/")
-        def index():
-            return {"message": "This is index route"}
+        @app.get("/")
+        def root():
+            return {
+                "ok": True,
+                "service": "oONOTTYOo99-Alert API",
+                "routes": [
+                    "/api",
+                    "/api/health",
+                    "/api/hello",
+                    "/api/ping",
+                ],
+            }
     """)
 
-    write(os.path.join(API_DIR, "routes", "hello", "index.py"), """
-        from fastapi import APIRouter
+    # /api/health
+    write(API_DIR / "health.py", """
+        from fastapi import FastAPI
+        app = FastAPI()
 
-        router = APIRouter()
+        @app.get("/")
+        def health():
+            return {"ok": True}
+    """)
 
-        @router.get("/")
+    # /api/hello
+    write(API_DIR / "hello.py", """
+        from fastapi import FastAPI
+        app = FastAPI()
+
+        @app.get("/")
         def hello():
             return {"message": "Hello from FastAPI!"}
     """)
 
-    # 5) สร้างไฟล์หลัก /api/index.py (ไฟล์นี้คือฟังก์ชันบน Vercel ที่แม็พกับ /api)
-    write(os.path.join(API_DIR, "index.py"), """
-        # /api/index.py  (Vercel -> /api)
+    # /api/ping
+    write(API_DIR / "ping.py", """
         from fastapi import FastAPI
-        from fastapi.middleware.cors import CORSMiddleware
+        app = FastAPI()
 
-        # ✅ Vercel ต้องการตัวแปรระดับโมดูลชื่อ 'app'
-        app = FastAPI(title="oONOTTYOo99-Alert API")
-
-        # เปิด CORS ชั่วคราว (ให้ทดสอบได้จากทุกโดเมน)
-        app.add_middleware(
-            CORSMiddleware,
-            allow_origins=["*"],
-            allow_methods=["*"],
-            allow_headers=["*"],
-            allow_credentials=True,
-        )
-
-        # ---------- Root (/api) ----------
         @app.get("/")
-        def api_root():
-            return {
-                "ok": True,
-                "service": "oONOTTYOo99-Alert API",
-                "routes": ["/api", "/api/health", "/api/index", "/api/hello"],
-            }
-
-        # ---------- Health (/api/health) ----------
-        @app.get("/health")
-        def api_health():
-            return {"ok": True}
-
-        # ---------- include sub-routers ----------
-        # ใช้ absolute import เพื่อให้ Vercel/Python หาแพ็กเกจเจอแน่นอน
-        from api.routes.index.index import router as index_router
-        from api.routes.hello.index import router as hello_router
-
-        app.include_router(index_router, prefix="/index")
-        app.include_router(hello_router, prefix="/hello")
+        def ping():
+            return {"ok": True, "endpoint": "/api/ping"}
     """)
 
-    print("✅ Rebuilt. Files created:")
-    for p in [
-        "api/__init__.py",
-        "api/index.py",
-        "api/routes/__init__.py",
-        "api/routes/index/__init__.py",
-        "api/routes/index/index.py",
-        "api/routes/hello/__init__.py",
-        "api/routes/hello/index.py",
-    ]:
-        print(" -", p)
-
-    print("\nNext:")
-    print("  1) Commit & push โค้ดขึ้น GitHub ให้ Vercel deploy อัตโนมัติ")
-    print("     git add -A && git commit -m \"Rebuild /api skeleton\" && git push")
-    print("  2) เปิดทดสอบ:")
-    print("     • /api           -> https://<your-app>.vercel.app/api")
-    print("     • /api/health    -> https://<your-app>.vercel.app/api/health")
-    print("     • /api/index     -> https://<your-app>.vercel.app/api/index")
-    print("     • /api/hello     -> https://<your-app>.vercel.app/api/hello")
+    print("✅ Rebuilt /api for Vercel + FastAPI, files created:")
+    for p in sorted(API_DIR.rglob("*.py")):
+        print(" -", p.relative_to(ROOT))
 
 if __name__ == "__main__":
-    main()
+    ensure_requirements()
+    rebuild_api()
