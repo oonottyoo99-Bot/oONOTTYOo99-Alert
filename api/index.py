@@ -2,13 +2,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-# ดึง routers (ต้องมี __init__.py ในโฟลเดอร์เหล่านี้แล้ว)
-from api.index.index import router as index_router   # ให้บริการ /api/index/*
-from api.hello.index import router as hello_router   # ให้บริการ /api/hello/*
-
 app = FastAPI(title="oONOTTYOo99-Alert API")
 
-# เปิด CORS (ทดสอบกว้าง)
+# CORS กว้างๆ (ช่วงทดสอบ)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -31,6 +27,16 @@ def api_root():
 def api_health():
     return {"ok": True}
 
-# -------- รวม routers --------
-app.include_router(index_router, prefix="/index")
-app.include_router(hello_router, prefix="/hello")
+# -------- include sub-routers (ใช้ relative import) --------
+# ⚠️ สำคัญ: ใช้จุดนำหน้า .index .hello เพื่ออิงโฟลเดอร์เดียวกันกับไฟล์นี้
+try:
+    from .index.index import router as index_router
+    from .hello.index import router as hello_router
+
+    app.include_router(index_router, prefix="/index")
+    app.include_router(hello_router, prefix="/hello")
+except Exception as e:
+    # ทางหนีไฟ: ถ้า import พลาด จะมี endpoint ให้เช็คสาเหตุได้ที่ /api/debug_import
+    @app.get("/debug_import")
+    def debug_import():
+        return {"import_error": str(e)}
