@@ -1,130 +1,99 @@
-# rebuild_api.py
-from pathlib import Path
-import shutil
+# rebuild_api.py  — ล้าง api/ เดิมและสร้างใหม่ให้ Vercel เห็นแน่นอน
+import os, shutil, textwrap, json, subprocess, sys
 
-ROOT = Path(__file__).resolve().parent
+ROOT = os.path.dirname(os.path.abspath(__file__))
+API_DIR = os.path.join(ROOT, "api")
 
-def rewrite(path: Path, content: str = ""):
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(content, encoding="utf-8")
+def write(path: str, content: str):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(textwrap.dedent(content).lstrip("\n"))
 
 def main():
-    # 1) ล้าง api/ เดิมออกให้เกลี้ยง
-    api_dir = ROOT / "api"
-    if api_dir.exists():
-        shutil.rmtree(api_dir)
+    # 1) ลบ api/ เก่าทิ้ง (ถ้ามี)
+    if os.path.isdir(API_DIR):
+        shutil.rmtree(API_DIR)
 
-    # 2) requirements.txt (ให้ FastAPI + Uvicorn)
-    rewrite(
-        ROOT / "requirements.txt",
-        "fastapi>=0.110.0\nuvicorn[standard]>=0.27.0\n",
-    )
+    # 2) เขียนโค้ดใหม่แบบขั้นต่ำสุดให้ใช้งานได้ทันที
+    #    - api/index.py  (มี app = FastAPI())
+    #    - api/index/index.py (router)
+    #    - api/hello/index.py (router)
+    #    - api/__init__.py , api/index/__init__.py , api/hello/__init__.py (ว่าง)
+    write(os.path.join(API_DIR, "__init__.py"), "")
 
-    # 3) vercel.json – ระบุ runtime ของ python ให้ฟังก์ชันใน api/
-    rewrite(
-        ROOT / "vercel.json",
-        '{\n'
-        '  "functions": {\n'
-        '    "api/**.py": { "runtime": "python3.11" }\n'
-        '  }\n'
-        '}\n'
-    )
+    write(os.path.join(API_DIR, "index.py"), """
+        from fastapi import FastAPI, APIRouter
 
-    # --------------------------
-    # โครงสร้าง api/
-    # --------------------------
-    # api/__init__.py
-    rewrite(ROOT / "api" / "__init__.py", "")
+        app = FastAPI(title="Vercel + FastAPI minimal")
 
-    # api/index.py (ตัวหลัก: FastAPI app, /, /health, include routers)
-    rewrite(
-        ROOT / "api" / "index.py",
-        '''\
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
+        @app.get("/")
+        def root():
+            return {
+                "ok": True,
+                "service": "oONOTTYOo99-Alert API",
+                "routes": ["/api", "/api/health", "/api/index", "/api/hello"],
+            }
 
-app = FastAPI(title="oONOTTYOo99-Alert API")
+        @app.get("/health")
+        def health():
+            return {"ok": True}
 
-# CORS (เปิดกว้างเพื่อทดสอบ)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"], allow_methods=["*"], allow_headers=["*"], allow_credentials=True,
-)
+        # include sub-routers
+        from .index.index import router as index_router
+        from .hello.index import router as hello_router
 
-@app.get("/")
-def api_root():
-    return {
-        "ok": True,
-        "service": "oONOTTYOo99-Alert API",
-        "routes": ["/api", "/api/health", "/api/index", "/api/hello"],
+        app.include_router(index_router, prefix="/index")
+        app.include_router(hello_router,  prefix="/hello")
+    """)
+
+    # /api/index/
+    write(os.path.join(API_DIR, "index", "__init__.py"), "")
+    write(os.path.join(API_DIR, "index", "index.py"), """
+        from fastapi import APIRouter
+
+        router = APIRouter()
+
+        @router.get("/")
+        def index():
+            return {"message": "This is index route"}
+    """)
+
+    # /api/hello/
+    write(os.path.join(API_DIR, "hello", "__init__.py"), "")
+    write(os.path.join(API_DIR, "hello", "index.py"), """
+        from fastapi import APIRouter
+
+        router = APIRouter()
+
+        @router.get("/")
+        def hello():
+            return {"message": "Hello from FastAPI!"}
+    """)
+
+    # 3) vercel.json — บังคับ runtime ของไฟล์ python ใน /api ให้เป็น python3.11
+    vercel_json_path = os.path.join(ROOT, "vercel.json")
+    vercel_json = {
+        "functions": {
+            "api/**/*.py": { "runtime": "python3.11" }
+        }
     }
+    with open(vercel_json_path, "w", encoding="utf-8") as f:
+        json.dump(vercel_json, f, indent=2)
 
-@app.get("/health")
-def api_health():
-    return {"ok": True}
+    # 4) requirements.txt (ให้แน่ใจว่ามี fastapi ติดตั้งตอนรัน)
+    req_path = os.path.join(ROOT, "requirements.txt")
+    if not os.path.exists(req_path):
+        write(req_path, """
+            fastapi==0.110.0
+        """)
 
-# รวม sub-routers (ใช้ absolute import)
-try:
-    from api._routes.index.index import router as index_router
-    from api._routes.hello.index import router as hello_router
+    # 5) git add + commit (ถ้าต้องการให้ push เอง ให้ uncomment บรรทัด push)
+    subprocess.run(["git", "add", "api", "vercel.json", "requirements.txt"], check=True)
+    subprocess.run(["git", "commit", "-m", "Rebuild api/ with minimal FastAPI + vercel.json"], check=True)
+    # subprocess.run(["git", "push"], check=True)
 
-    app.include_router(index_router, prefix="/index")
-    app.include_router(hello_router, prefix="/hello")
-
-except Exception as e:
-    # มี endpoint ให้เช็ค error import ได้ที่ /api/debug_import
-    @app.get("/debug_import")
-    def debug_import():
-        return {"import_error": str(e)}
-'''
-    )
-
-    # api/_routes/index/__init__.py
-    rewrite(ROOT / "api" / "_routes" / "index" / "__init__.py", "")
-
-    # api/_routes/index/index.py
-    rewrite(
-        ROOT / "api" / "_routes" / "index" / "index.py",
-        '''\
-from fastapi import APIRouter
-
-router = APIRouter()
-
-@router.get("/")
-def index():
-    return {"message": "This is index route"}
-'''
-    )
-
-    # api/_routes/hello/__init__.py
-    rewrite(ROOT / "api" / "_routes" / "hello" / "__init__.py", "")
-
-    # api/_routes/hello/index.py
-    rewrite(
-        ROOT / "api" / "_routes" / "hello" / "index.py",
-        '''\
-from fastapi import APIRouter
-
-router = APIRouter()
-
-@router.get("/")
-def hello():
-    return {"message": "Hello from FastAPI!"}
-'''
-    )
-
-    print("✅ Rebuilt /api for Vercel + FastAPI, files created:")
-    for p in [
-        "api/__init__.py",
-        "api/index.py",
-        "api/_routes/index/__init__.py",
-        "api/_routes/index/index.py",
-        "api/_routes/hello/__init__.py",
-        "api/_routes/hello/index.py",
-        "requirements.txt",
-        "vercel.json",
-    ]:
-        print(" -", p)
+    print("✅ Rebuilt api/ and wrote vercel.json. Commit created.")
+    print("👉 ตรวจใน Vercel > Deployments ให้เกิด deployment ใหม่จาก commit นี้")
 
 if __name__ == "__main__":
     main()
