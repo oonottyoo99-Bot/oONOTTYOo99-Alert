@@ -1,74 +1,52 @@
-# rebuild_api.py
-import os, shutil, pathlib, textwrap
+# rebuild_api.py  — รีเซ็ต /api ให้เหลือ minimal FastAPI 1 ไฟล์สำหรับ Vercel
+# ทำให้ /api (root) และ /api/health ใช้งานได้แน่นอน
 
-ROOT = pathlib.Path(__file__).parent.resolve()
-API_DIR = ROOT / "api"
+import json, os, shutil, textwrap
 
-def write(path: pathlib.Path, content: str):
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(textwrap.dedent(content).lstrip(), encoding="utf-8")
+ROOT = os.path.dirname(__file__)
+API_DIR = os.path.join(ROOT, "api")
 
-def main():
-    # 1) ลบโฟลเดอร์ api/ เดิมทั้งหมด เพื่อเคลียร์ของเก่า
-    if API_DIR.exists():
-        shutil.rmtree(API_DIR)
+# 1) ลบ api เดิมทั้งโฟลเดอร์ (ถ้ามี)
+if os.path.isdir(API_DIR):
+    shutil.rmtree(API_DIR)
 
-    # 2) สร้างโครงใหม่แบบที่ Vercel ต้องการ (หนึ่งไฟล์ต่อหนึ่ง endpoint)
-    #    - /api/index.py    -> GET /api
-    #    - /api/health.py   -> GET /api/health
-    #    - /api/hello.py    -> GET /api/hello
-    write(API_DIR / "__init__.py", "# marker\n")
+# 2) สร้างโฟลเดอร์ api ใหม่ (ไม่มี __init__.py!)
+os.makedirs(API_DIR, exist_ok=True)
 
-    write(API_DIR / "index.py", """
-    from fastapi import FastAPI
+# 3) สร้างไฟล์ api/index.py (ไฟล์เดียวเท่านั้น)
+index_py = textwrap.dedent("""
+from fastapi import FastAPI
 
-    app = FastAPI(title="API root")
+app = FastAPI(title="oONOTTYOo99-Alert API (Minimal)")
 
-    @app.get("/")
-    def root():
-        return {"ok": True, "service": "oONOTTYOo99-Alert API", "routes": ["/api", "/api/health", "/api/hello"]}
-    """)
-
-    write(API_DIR / "health.py", """
-    from fastapi import FastAPI
-
-    app = FastAPI(title="Health")
-
-    @app.get("/")
-    def health():
-        return {"ok": True}
-    """)
-
-    write(API_DIR / "hello.py", """
-    from fastapi import FastAPI
-
-    app = FastAPI(title="Hello")
-
-    @app.get("/")
-    def hello():
-        return {"message": "Hello from FastAPI!"}
-    """)
-
-    # 3) (แนะนำ) ใส่ vercel.json บอก runtime ของฟังก์ชัน Python ให้ชัด
-    write(ROOT / "vercel.json", """
-    {
-      "functions": {
-        "api/*.py": {
-          "runtime": "python3.11"
-        }
-      }
+@app.get("/")
+def root():
+    return {
+        "ok": True,
+        "service": "oONOTTYOo99-Alert API (Minimal)",
+        "routes": ["/api", "/api/health"]
     }
-    """)
 
-    # 4) (สำคัญ) ให้แน่ใจว่ามี requirements.txt ที่ root
-    #    ถ้าไฟล์คุณมีอยู่แล้ว จะไม่เขียนทับ; ถ้ายังไม่มี จะสร้างให้
-    req = ROOT / "requirements.txt"
-    if not req.exists():
-        write(req, """
-        fastapi>=0.110.0
-        uvicorn[standard]>=0.27.0
-        """)
-    print("✅ Rebuilt /api for Vercel + FastAPI")
+@app.get("/health")
+def health():
+    return {"ok": True}
+""").strip() + "\n"
 
-if __name__ == "__main__":
-    main()
+with open(os.path.join(API_DIR, "index.py"), "w", encoding="utf-8") as f:
+    f.write(index_py)
+
+# 4) vercel.json — บอกให้ใช้ Python runtime กับทุกไฟล์ใน api/**/*.py
+vercel_json = {
+    "functions": {
+        "api/**/*.py": {
+            "runtime": "python3.12"
+        }
+    }
+}
+with open(os.path.join(ROOT, "vercel.json"), "w", encoding="utf-8") as f:
+    json.dump(vercel_json, f, indent=2)
+
+print("✅ Rebuilt minimal /api for Vercel:")
+print(" - api/index.py")
+print(" - vercel.json (python3.12)")
+print("\nถัดไปให้ commit/push แล้วทดสอบ /api และ /api/health ครับ")
