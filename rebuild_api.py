@@ -1,99 +1,74 @@
-# rebuild_api.py  — ล้าง api/ เดิมและสร้างใหม่ให้ Vercel เห็นแน่นอน
-import os, shutil, textwrap, json, subprocess, sys
+# rebuild_api.py
+import os, shutil, pathlib, textwrap
 
-ROOT = os.path.dirname(os.path.abspath(__file__))
-API_DIR = os.path.join(ROOT, "api")
+ROOT = pathlib.Path(__file__).parent.resolve()
+API_DIR = ROOT / "api"
 
-def write(path: str, content: str):
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, "w", encoding="utf-8") as f:
-        f.write(textwrap.dedent(content).lstrip("\n"))
+def write(path: pathlib.Path, content: str):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(textwrap.dedent(content).lstrip(), encoding="utf-8")
 
 def main():
-    # 1) ลบ api/ เก่าทิ้ง (ถ้ามี)
-    if os.path.isdir(API_DIR):
+    # 1) ลบโฟลเดอร์ api/ เดิมทั้งหมด เพื่อเคลียร์ของเก่า
+    if API_DIR.exists():
         shutil.rmtree(API_DIR)
 
-    # 2) เขียนโค้ดใหม่แบบขั้นต่ำสุดให้ใช้งานได้ทันที
-    #    - api/index.py  (มี app = FastAPI())
-    #    - api/index/index.py (router)
-    #    - api/hello/index.py (router)
-    #    - api/__init__.py , api/index/__init__.py , api/hello/__init__.py (ว่าง)
-    write(os.path.join(API_DIR, "__init__.py"), "")
+    # 2) สร้างโครงใหม่แบบที่ Vercel ต้องการ (หนึ่งไฟล์ต่อหนึ่ง endpoint)
+    #    - /api/index.py    -> GET /api
+    #    - /api/health.py   -> GET /api/health
+    #    - /api/hello.py    -> GET /api/hello
+    write(API_DIR / "__init__.py", "# marker\n")
 
-    write(os.path.join(API_DIR, "index.py"), """
-        from fastapi import FastAPI, APIRouter
+    write(API_DIR / "index.py", """
+    from fastapi import FastAPI
 
-        app = FastAPI(title="Vercel + FastAPI minimal")
+    app = FastAPI(title="API root")
 
-        @app.get("/")
-        def root():
-            return {
-                "ok": True,
-                "service": "oONOTTYOo99-Alert API",
-                "routes": ["/api", "/api/health", "/api/index", "/api/hello"],
-            }
-
-        @app.get("/health")
-        def health():
-            return {"ok": True}
-
-        # include sub-routers
-        from .index.index import router as index_router
-        from .hello.index import router as hello_router
-
-        app.include_router(index_router, prefix="/index")
-        app.include_router(hello_router,  prefix="/hello")
+    @app.get("/")
+    def root():
+        return {"ok": True, "service": "oONOTTYOo99-Alert API", "routes": ["/api", "/api/health", "/api/hello"]}
     """)
 
-    # /api/index/
-    write(os.path.join(API_DIR, "index", "__init__.py"), "")
-    write(os.path.join(API_DIR, "index", "index.py"), """
-        from fastapi import APIRouter
+    write(API_DIR / "health.py", """
+    from fastapi import FastAPI
 
-        router = APIRouter()
+    app = FastAPI(title="Health")
 
-        @router.get("/")
-        def index():
-            return {"message": "This is index route"}
+    @app.get("/")
+    def health():
+        return {"ok": True}
     """)
 
-    # /api/hello/
-    write(os.path.join(API_DIR, "hello", "__init__.py"), "")
-    write(os.path.join(API_DIR, "hello", "index.py"), """
-        from fastapi import APIRouter
+    write(API_DIR / "hello.py", """
+    from fastapi import FastAPI
 
-        router = APIRouter()
+    app = FastAPI(title="Hello")
 
-        @router.get("/")
-        def hello():
-            return {"message": "Hello from FastAPI!"}
+    @app.get("/")
+    def hello():
+        return {"message": "Hello from FastAPI!"}
     """)
 
-    # 3) vercel.json — บังคับ runtime ของไฟล์ python ใน /api ให้เป็น python3.11
-    vercel_json_path = os.path.join(ROOT, "vercel.json")
-    vercel_json = {
-        "functions": {
-            "api/**/*.py": { "runtime": "python3.11" }
+    # 3) (แนะนำ) ใส่ vercel.json บอก runtime ของฟังก์ชัน Python ให้ชัด
+    write(ROOT / "vercel.json", """
+    {
+      "functions": {
+        "api/*.py": {
+          "runtime": "python3.11"
         }
+      }
     }
-    with open(vercel_json_path, "w", encoding="utf-8") as f:
-        json.dump(vercel_json, f, indent=2)
+    """)
 
-    # 4) requirements.txt (ให้แน่ใจว่ามี fastapi ติดตั้งตอนรัน)
-    req_path = os.path.join(ROOT, "requirements.txt")
-    if not os.path.exists(req_path):
-        write(req_path, """
-            fastapi==0.110.0
+    # 4) (สำคัญ) ให้แน่ใจว่ามี requirements.txt ที่ root
+    #    ถ้าไฟล์คุณมีอยู่แล้ว จะไม่เขียนทับ; ถ้ายังไม่มี จะสร้างให้
+    req = ROOT / "requirements.txt"
+    if not req.exists():
+        write(req, """
+        fastapi>=0.110.0
+        uvicorn[standard]>=0.27.0
         """)
-
-    # 5) git add + commit (ถ้าต้องการให้ push เอง ให้ uncomment บรรทัด push)
-    subprocess.run(["git", "add", "api", "vercel.json", "requirements.txt"], check=True)
-    subprocess.run(["git", "commit", "-m", "Rebuild api/ with minimal FastAPI + vercel.json"], check=True)
-    # subprocess.run(["git", "push"], check=True)
-
-    print("✅ Rebuilt api/ and wrote vercel.json. Commit created.")
-    print("👉 ตรวจใน Vercel > Deployments ให้เกิด deployment ใหม่จาก commit นี้")
+    print("✅ Rebuilt /api for Vercel + FastAPI")
 
 if __name__ == "__main__":
     main()
