@@ -1,41 +1,41 @@
 # api/index.py
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi import APIRouter
 
-app = FastAPI(title="oONOTTYOo99-Alert API (minimal)")
+app = FastAPI(title="oONOTTYOo99-Alert API")
 
-# CORS (ผ่อนคลายไว้ก่อน)
+# CORS (เปิดกว้างตามที่คุณใช้)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], allow_methods=["*"],
-    allow_headers=["*"], allow_credentials=True,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+    allow_credentials=True,
 )
 
-# --- root ของแอป (จะกลายเป็น /api บน Vercel) ---
+# -------- Root /api --------
 @app.get("/")
 def api_root():
     return {
         "ok": True,
         "service": "oONOTTYOo99-Alert API",
-        "routes": ["/api", "/api/health", "/api/index", "/api/hello"]
+        "routes": ["/api", "/api/health", "/api/index", "/api/hello"],
     }
 
-# --- health ---
+# -------- Health /api/health --------
 @app.get("/health")
 def api_health():
     return {"ok": True}
 
-# --- /api/index ---
-index_router = APIRouter()
-@index_router.get("/")
-def index():
-    return {"message": "This is index route"}
-app.include_router(index_router, prefix="/index")
+# -------- รวม sub-routers ถ้ามี (ไม่บังคับ) --------
+try:
+    from api._routes.index import router as index_router  # ถ้ามีโครงสร้างแบบ api/_routes/index.py
+    app.include_router(index_router, prefix="/index")
+except Exception:
+    pass
 
-# --- /api/hello ---
-hello_router = APIRouter()
-@hello_router.get("/")
-def hello():
-    return {"message": "Hello from FastAPI!"}
-app.include_router(hello_router, prefix="/hello")
+try:
+    from api._routes.hello import router as hello_router  # ถ้ามีโครงสร้างแบบ api/_routes/hello.py
+    app.include_router(hello_router, prefix="/hello")
+except Exception:
+    pass
