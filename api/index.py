@@ -1,22 +1,15 @@
-from fastapi import FastAPI, APIRouter
+import json
+from datetime import datetime
 
-app = FastAPI(title="oONOTTYOo99-Alert API")
-
-@app.get("/")
-def root():
-    return {
+def handler(request):
+    body = {
         "ok": True,
-        "service": "oONOTTYOo99-Alert API",
-        "routes": ["/api", "/api/health", "/api/hello"]
+        "service": "oONOTTYOo99-Alert (native python function)",
+        "time": datetime.utcnow().isoformat() + "Z",
+        "routes": ["/api"]  # ตอนนี้ทำ route เดียวให้ผ่านก่อน
     }
-
-@app.get("/health")
-def health():
-    return {"status": "ok"}
-
-hello = APIRouter()
-@hello.get("/")
-def say_hello():
-    return {"message": "Hello from FastAPI on Vercel!"}
-
-app.include_router(hello, prefix="/hello")
+    return {
+        "status": 200,
+        "headers": {"content-type": "application/json; charset=utf-8"},
+        "body": json.dumps(body)
+    }
