@@ -1,15 +1,34 @@
-import json
-from datetime import datetime
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
-def handler(request):
-    body = {
-        "ok": True,
-        "service": "oONOTTYOo99-Alert (native python function)",
-        "time": datetime.utcnow().isoformat() + "Z",
-        "routes": ["/api"]  # ตอนนี้ทำ route เดียวให้ผ่านก่อน
-    }
+app = FastAPI(title="oONOTTYOo99-Alert API")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+    allow_credentials=True,
+)
+
+@app.get("/")
+def root():
     return {
-        "status": 200,
-        "headers": {"content-type": "application/json; charset=utf-8"},
-        "body": json.dumps(body)
+        "ok": True,
+        "service": "oONOTTYOo99-Alert API",
+        "routes": ["/api", "/api/health", "/api/hello"]
     }
+
+@app.get("/health")
+def health():
+    return {"ok": True}
+
+# sub-router 'hello'
+from fastapi import APIRouter
+hello = APIRouter()
+
+@hello.get("/")
+def say_hello():
+    return {"message": "Hello from FastAPI on Vercel!"}
+
+app.include_router(hello, prefix="/hello")
