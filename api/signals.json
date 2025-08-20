@@ -1,35 +1,29 @@
 {
-  "group": "sp500",
-  "updatedAt": "2025-08-20T07:23:55.485Z",
+  "group": "nasdaq100",
+  "updatedAt": "2025-08-20T07:24:24.790Z",
   "results": [
     {
-      "ticker": "AAPL",
+      "ticker": "AMZN",
       "signal": "-",
-      "price": 230.56,
+      "price": 228.01,
       "timeframe": "1D"
     },
     {
-      "ticker": "MSFT",
-      "signal": "Sell",
-      "price": 509.77,
+      "ticker": "TSLA",
+      "signal": "-",
+      "price": 329.31,
       "timeframe": "1D"
     },
     {
-      "ticker": "NVDA",
+      "ticker": "GOOGL",
       "signal": "Sell",
-      "price": 175.64,
+      "price": 201.57,
       "timeframe": "1D"
     },
     {
-      "ticker": "META",
+      "ticker": "QQQ",
       "signal": "Sell",
-      "price": 751.48,
-      "timeframe": "1D"
-    },
-    {
-      "ticker": "SPY",
-      "signal": "Sell",
-      "price": 639.81,
+      "price": 569.28,
       "timeframe": "1D"
     }
   ]
