@@ -1,5 +1,7 @@
 {
   "auto_scan_groups": [
-    "sp500"
+    "sp500",
+    "nasdaq100",
+    "altcoins"
   ]
 }
